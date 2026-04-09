@@ -38,7 +38,6 @@ dnspython==2.8.0
 docstring_parser==0.17.0
 dotenv==0.9.9
 email-validator==2.3.0
--e git+ssh://git@github.ibm.com/IBM-Research-AI/error_map.git@1a93a7ae84761e154d7c37b2d06843062ecf758c#egg=error_map
 eval_type_backport==0.2.2
 exceptiongroup==1.3.0
 faiss-cpu==1.11.0

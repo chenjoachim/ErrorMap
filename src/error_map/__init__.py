@@ -12,7 +12,7 @@ from .inference import InferenceClient
 
 class ErrorMap:
     
-    def __init__(self, 
+    def __init__(self,
                  inference_type: str = "litellm-mock",
                  litellm_config: Optional[Dict] = None,
                  exp_id: str = None,
@@ -23,12 +23,14 @@ class ErrorMap:
                  judge: Optional[str] = None,
                  provider: Optional[str] = None,
                  seed: Optional[int] = None,
-                 models: List[str] = None, 
+                 models: List[str] = None,
                  ratio: float = 0.1,
                  max_workers: int = 100,
                  use_correct_predictions: bool = True,
                  rare_freq: float = 0.0,
                  cols_to_keep: List[str] = None,
+                 asr: bool = False,
+                 reuse_taxonomy_path: str = None,
                  ):
         
         
@@ -61,6 +63,8 @@ class ErrorMap:
         self.litellm_config = litellm_config
         self.rare_freq = rare_freq
         self.cols_to_keep = cols_to_keep
+        self.asr = asr
+        self.reuse_taxonomy_path = reuse_taxonomy_path
         
         # save exp. config params
         params = {
@@ -91,6 +95,7 @@ class ErrorMap:
             dataset_params=dataset_params or dataset2params,
             taxonomy_params=TaxonomyParams(),
             seed=seed,
+            asr=asr,
         )
 
         # Setup inference client
@@ -135,12 +140,13 @@ class ErrorMap:
 
         if analyzed:
             await construct_taxonomy_recursively(
-                records=analyzed, 
-                config=self.config, 
+                records=analyzed,
+                config=self.config,
                 exp_id=self.exp_id,
                 inference_client=self.inference_client,
                 rare_freq=self.rare_freq,
                 cols_to_keep=self.cols_to_keep,
+                reuse_taxonomy_path=self.reuse_taxonomy_path,
             )
         else:
             print("ℹ️ No errors to build taxonomy")

@@ -44,7 +44,7 @@ def _map_error_to_category(results: List[Dict], categories: Dict) -> Dict:
                     print(f"Error category '{err_cat}' doesn't exist! Error text: '{err_text}'. Applying 'Other' category instead.")
                     norm_err_cat = _norm("Other")
 
-                error2category[err_text] = norm_categories[norm_err_cat]
+                error2category[_norm(err_text)] = norm_categories[norm_err_cat]
 
             except Exception as e:
                 print(f"Unexpected error while processing error entry: {e}")
@@ -61,9 +61,9 @@ async def _merge_records_with_categories(record: Dict, error_title: str, error_s
     cat = ""
     cat_desc = ""
     if error_title:
-        if error_title not in error2category:
+        if _norm(error_title) not in error2category:
             print(f"Error label haven't been assigned with a category! error text: {error_title}. Assigning 'Other' category instead.")
-        cat = error2category.get(error_title, "Other")
+        cat = error2category.get(_norm(error_title), "Other")
         cat_desc = categories.get(cat, "")
 
     return {

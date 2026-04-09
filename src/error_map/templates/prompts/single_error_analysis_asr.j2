@@ -1,0 +1,72 @@
+You are an expert linguistic and audio analyst. Your job is to evaluate an ASR transcription against a ground truth audio/reference, identify phonetic or contextual discrepancies, and diagnose the root cause of the transcription error. Reasoning: high.
+
+You are given the following:
+- An audio transcript context (Ground Truth)
+- A model transcription that was labeled incorrect (Hypothesis)
+{% if correct_audio_metadata %}
+- Audio metadata (e.g., sample rate, noise level, speaker accent)
+{% endif %}
+{% if reference_phonemes %}
+- A phonetic representation of the correct output
+{% endif %}
+
+Your task:
+
+1. Identify the 1-3 most significant transcription errors by comparing the hypothesis to the reference word by word.
+
+2. For each error, provide:
+criterion: The specific word or phrase that was transcribed incorrectly
+present_in_wrong: Whether an attempt at the word/phrase is present in the hypothesis
+quality: "incorrect", "partially correct", or "correct"
+evidence: The word(s) from the hypothesis (quote)
+comment: The acoustic or linguistic reason (e.g., "Homophone confusion: 'two' vs 'to'", "Proper noun not in vocabulary", "Word deleted")
+
+3. Summarize in final_answer:
+error_summary: The main acoustic or linguistic weakness in one sentence.
+error_title: The single dominant error type. Max 3 words. Name the operation and the linguistic phenomenon or entity type — not the grammatical class.
+✓ "Homophone Substitution", "Proper Noun Deletion", "Number Insertion", "Filler Word Insertion"
+✗ "Verb Substitution", "Word Substitution", "Noun Deletion" — grammatical class is too vague; use the acoustic or linguistic cause you identified in your reasoning instead.
+Do not combine multiple error types with "&", "/", "+", or "and" — pick the one that had the most impact on meaning.
+* If no meaningful word-level error exists (e.g., only punctuation differs), leave all final_answer fields empty.
+
+Output the final result in the following format:
+{
+  "required_criteria": [
+    {
+      "criterion": "Accurate transcription of 'two'",
+      "present_in_wrong": true,
+      "quality": "incorrect",
+      "evidence": "to",
+      "comment": "Homophone confusion: acoustically identical but different meaning."
+    }
+  ],
+  "final_answer": {
+    "error_summary": "The model confused a numeral with its homophone, losing numeric meaning.",
+    "error_title": "Homophone Substitution"
+  }
+}
+
+Use the following inputs:
+
+Context:
+{{ input_text }}
+
+Ground Truth (Reference):
+{{ correct_answer }}
+
+{% if reference_phonemes %}
+Phonetic Reference:
+{{ reference_phonemes }}
+{% endif %}
+
+{% if audio_metadata %}
+Audio Metadata:
+{{ audio_metadata }}
+{% endif %}
+
+Hypothesis (incorrect prediction):
+{{ output_text }}
+
+Keeping the transcription accuracy criteria in mind, do not provide a general assessment. Be specific, structured, and phonetically grounded.
+
+Assessment:

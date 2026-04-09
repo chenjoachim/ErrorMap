@@ -5,7 +5,6 @@ import aiohttp
 import litellm
 from error_map.templates.json_renderer import JSONRenderer
 from ..templates import TemplateRenderer
-from litellm.caching.caching import Cache
 
 
 class InferenceClient:
@@ -32,7 +31,6 @@ class InferenceClient:
         self.schema_renderer = JSONRenderer()
         
         self.client = litellm
-        litellm.cache = Cache(type="disk", path="./litellm_cache")    
 
         if litellm_config:
             self.judge = litellm_config.get("model", "")

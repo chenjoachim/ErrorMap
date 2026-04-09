@@ -13,7 +13,7 @@ import ast
 from tqdm.asyncio import tqdm_asyncio
 
 
-async def analyze_record(record: Dict, inference_client: InferenceClient, success_outputs: Dict, use_correct_predictions: bool) -> Dict:
+async def analyze_record(record: Dict, inference_client: InferenceClient, success_outputs: Dict, use_correct_predictions: bool, asr: bool = False) -> Dict:
     # Add correct outputs
     key = (record['dataset'], record['example_id'])
     record['correct_output_list'] = success_outputs.get(key, [])
@@ -38,8 +38,9 @@ async def analyze_record(record: Dict, inference_client: InferenceClient, succes
     }
 
     try:
+        template_name = "single_error_analysis_asr.j2" if asr else "single_error_analysis.j2"
         inference_result = await inference_client.infer(
-            "single_error_analysis.j2",
+            template_name,
             template_vars,
             schema_name="single_error_schema.json"
         )
@@ -107,4 +108,4 @@ async def analyze_single_errors(
     print(f"Analyzing {len(error_records)} error records in parallel...")
 
     # Analyze all errors in parallel
-    return await tqdm_asyncio.gather(*[analyze_record(record, inference_client, success_outputs, use_correct_predictions) for record in error_records])
+    return await tqdm_asyncio.gather(*[analyze_record(record, inference_client, success_outputs, use_correct_predictions, asr=config.asr) for record in error_records])

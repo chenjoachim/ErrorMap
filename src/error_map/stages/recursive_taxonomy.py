@@ -13,13 +13,26 @@ import math
 import asyncio
 
 
+def _load_existing_taxonomy(taxonomy_path: str) -> List[Dict]:
+    """Load a saved taxonomy JSON and convert it to the format classify_errors expects."""
+    with open(taxonomy_path) as f:
+        tree = json.load(f)
+    clusters = [
+        {"id": i + 1, "name": child["name"], "description": child.get("info", {}).get("description", "")}
+        for i, child in enumerate(tree.get("children", []))
+    ]
+    print(f"Reusing existing taxonomy with {len(clusters)} categories: {[c['name'] for c in clusters]}")
+    return [{"judge_response": json.dumps({"clusters": clusters})}]
+
+
 async def _run_taxonomy_stages(
-    records: List[Dict], 
+    records: List[Dict],
     config: Config,
     exp_id: str,
     inference_client: InferenceClient,
     parent_category_name: str = None,
     rare_freq: float = None,
+    existing_taxonomy: List[Dict] = None,
 ) -> List[Dict]:
 
     # define curr taxonomy size (max num of clusters)
@@ -30,14 +43,16 @@ async def _run_taxonomy_stages(
     # in case there is already a parent category, specify it in the prompt
     curr_taxonomy_params["parent_category"] = parent_category_name
 
-    # run stages: create categories, classify errors, and pupolate 
-    taxonomy = await construct_taxonomy(
-        error_records=records,
-        config=config,
-        exp_id=exp_id,
-        inference_client=inference_client,
-        taxonomy_params=curr_taxonomy_params,
-    ) if records else []
+    if existing_taxonomy:
+        taxonomy = existing_taxonomy
+    else:
+        taxonomy = await construct_taxonomy(
+            error_records=records,
+            config=config,
+            exp_id=exp_id,
+            inference_client=inference_client,
+            taxonomy_params=curr_taxonomy_params,
+        ) if records else []
 
     if not taxonomy:
         print("ℹ️ No errors to build taxonomy")
@@ -81,47 +96,53 @@ def _add_children_to_node(
     taxonomy_tree: TaxonomyTree,
     depth: int,
 ):
-    def create_node(name: str, info: Dict) -> TaxonomyNode:
-        return TaxonomyNode(
-            id=_get_str_from_params(parent=parent_node.name, name=name, depth=depth),
-            name=name,
-            info=info
-        )
-
     if isinstance(items, list):  # Records case
         for item in items:
             if not item:
                 continue
             name = item.get("error_title", "Unknown")
-            child = create_node(name, item)
+            # Use example_id to make leaf IDs unique — prevents deduplication
+            # of instances that share the same error_title
+            instance_id = item.get("example_id", id(item))
+            child = TaxonomyNode(
+                id=_get_str_from_params(parent=parent_node.name, name=name, depth=depth) + f"__instance={instance_id}",
+                name=name,
+                info=item,
+            )
             taxonomy_tree.add_node(parent_node=parent_node, child=child)
 
     elif isinstance(items, dict):  # Categories case
         for name, description in items.items():
             if not name:
                 continue
-            info = {"description": description}
-            child = create_node(name, info)
+            child = TaxonomyNode(
+                id=_get_str_from_params(parent=parent_node.name, name=name, depth=depth),
+                name=name,
+                info={"description": description},
+            )
             taxonomy_tree.add_node(parent_node=parent_node, child=child)
 
     print(f"Added {len(parent_node.children)} items under '{parent_node.name}'")
 
 
 async def _recurse_error_collection(
-    records: List[Dict], 
+    records: List[Dict],
     config: Config,
     exp_id: str,
     inference_client: InferenceClient,
-    parent_node: TaxonomyNode = None, 
-    depth: int = 0, 
+    parent_node: TaxonomyNode = None,
+    depth: int = 0,
     max_depth: int = 2,
     taxonomy_tree: TaxonomyTree = None,
     rare_freq: float = None,
+    existing_taxonomy: List[Dict] = None,
 ):
     print(f"in recurse, records: {len(records)}")
 
     parent_node_name = parent_node.name if depth > 0 and parent_node.name else None # avoid using the name of the root node or an empty string
-    populated = await _run_taxonomy_stages(records, config, exp_id, inference_client, parent_category_name=parent_node_name, rare_freq=rare_freq)
+    # only reuse taxonomy at the top level (depth 0); sub-categories are always rebuilt
+    top_level_taxonomy = existing_taxonomy if depth == 0 else None
+    populated = await _run_taxonomy_stages(records, config, exp_id, inference_client, parent_category_name=parent_node_name, rare_freq=rare_freq, existing_taxonomy=top_level_taxonomy)
     if not populated:
         return
 
@@ -153,12 +174,12 @@ async def _recurse_error_collection(
             _add_children_to_node(curr_records, category_node, taxonomy_tree, depth)
         else:
             tasks.append(_recurse_error_collection(
-                records=curr_records, 
+                records=curr_records,
                 config=config,
                 exp_id=exp_id,
                 inference_client=inference_client,
-                parent_node=category_node, 
-                depth=depth + 1, 
+                parent_node=category_node,
+                depth=depth + 1,
                 max_depth=max_depth,
                 taxonomy_tree=taxonomy_tree,
                 rare_freq=rare_freq,
@@ -169,14 +190,15 @@ async def _recurse_error_collection(
 
 @cached("construct_taxonomy_recursively", None)
 async def construct_taxonomy_recursively(
-    records: List[Dict], 
+    records: List[Dict],
     config: Config,
     exp_id: str,
     inference_client: InferenceClient,
-    depth: int = 0, 
+    depth: int = 0,
     max_depth: int = 2,
     rare_freq: float = None,
     cols_to_keep: List[str] = None,
+    reuse_taxonomy_path: str = None,
 ) -> List[Dict]:
     root_name = "LLM Errors"
     root = TaxonomyNode(
@@ -185,15 +207,18 @@ async def construct_taxonomy_recursively(
     )
     taxonomy_tree = TaxonomyTree(root)
 
+    existing_taxonomy = _load_existing_taxonomy(reuse_taxonomy_path) if reuse_taxonomy_path else None
+
     await _recurse_error_collection(
-                records=records, 
+                records=records,
                 config=config,
                 exp_id=exp_id,
                 inference_client=inference_client,
-                parent_node=root, 
-                depth=depth, 
+                parent_node=root,
+                depth=depth,
                 max_depth=max_depth,
                 taxonomy_tree=taxonomy_tree,
+                existing_taxonomy=existing_taxonomy,
                 rare_freq=rare_freq,
             )
     try:

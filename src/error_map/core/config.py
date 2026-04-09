@@ -7,19 +7,21 @@ from error_map.utils.constants import TaxonomyParams
 
 
 class Config:
-    def __init__(self, 
+    def __init__(self,
                  data_path: str = None,
                  output_dir: Path = None,
                  datasets: List[str] = None,
                  dataset_params: Dict = None,
                  taxonomy_params: TaxonomyParams = None,
-                 seed: int = None):
+                 seed: int = None,
+                 asr: bool = False):
         self.data_path = data_path or "data"
         self.output_dir = output_dir or Path("output")
         self.datasets = datasets or []
         self.dataset_params = dataset_params or {}
         self.taxonomy_params = taxonomy_params.get() if taxonomy_params else {}
         self.seed = seed
+        self.asr = asr
 
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)

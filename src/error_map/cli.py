@@ -21,6 +21,7 @@ async def main():
     parser.add_argument("--judge", help="Judge model")
     parser.add_argument("--provider", help="Inference provider", choices=["azure", "rits"])
     parser.add_argument("--no-use-correct-predictions", action="store_false", dest="use_correct_predictions", help="Disable adding correct predictions from other models (enabled by default)")
+    parser.add_argument("--asr", action="store_true", default=False, help="Use ASR-specific error analysis prompt")
     args = parser.parse_args()
     
     error_map = ErrorMap(
@@ -36,6 +37,7 @@ async def main():
         use_correct_predictions=args.use_correct_predictions,
         models=args.models,
         ratio=args.ratio,
+        asr=args.asr,
     )
     
     results = await error_map.run()
