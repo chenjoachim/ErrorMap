@@ -10,7 +10,7 @@ class TaxonomyParams:
         metadata={"description": "Size of minibatches for data processing."}
     )
     classify_batch_size: int = field(
-        default=10,
+        default=5,
         metadata={"description": "Size of minibatches for item classification."}
     )
     suggestion_length: int = field(

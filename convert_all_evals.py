@@ -10,9 +10,26 @@ import os
 import zipfile
 import csv
 from pathlib import Path
+from whisper_normalizer.english import EnglishTextNormalizer
+from whisper_normalizer.basic import BasicTextNormalizer
 
 EVALS_DIR = "higgs_evals"
 OUTPUT_DIR = "data"
+
+_english_normalizer = EnglishTextNormalizer()
+_basic_normalizer = BasicTextNormalizer()
+
+
+def normalize_text(text: str, language: str = "en") -> str:
+    """Normalize ASR text using Whisper's normalizers.
+
+    Uses EnglishTextNormalizer for English (matches open_asr leaderboard),
+    and BasicTextNormalizer for all other languages.
+    """
+    if language == "en" or language == "en-us":
+        return _english_normalizer(text)
+    return _basic_normalizer(text)
+
 
 def process_eval_file(eval_path, all_dataset_rows):
     filename = os.path.basename(eval_path)
@@ -81,9 +98,9 @@ def process_eval_file(eval_path, all_dataset_rows):
             "example_id": item.get("id", ""),
             "model": model_name,
             "input_text": input_text,
-            "output_text": scorer.get("answer", ""),
+            "output_text": normalize_text(scorer.get("answer", ""), language),
             "score": score_val,
-            "correct_answer": item.get("target", ""),
+            "correct_answer": normalize_text(item.get("target", ""), language),
         })
 
 

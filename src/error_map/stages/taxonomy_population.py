@@ -20,50 +20,43 @@ def _norm(text: str) -> str:
 
 def _map_error_to_category(results: List[Dict], categories: Dict) -> Dict:
     norm_categories = {_norm(category): category for category in categories.keys()}
-    error2category = defaultdict(str)
+    id2category = {}
 
     for result in results:
-        try:
-            errors_raw = result.get("judge_response", "[]")
-            errors = json.loads(errors_raw).get("classified_errors", [])
-        except (json.JSONDecodeError, AttributeError, TypeError) as e:
-            print(f"Failed to parse judge_response: {e}")
-            continue
-
-        for error in errors:
+        for entry in result.get("record_categories", []):
             try:
-                err_text = error.get("error_text", "").strip()
-                err_cat = error.get("category", "").strip()
+                record_id = entry.get("record_id")
+                err_cat = (entry.get("category") or "").strip()
 
-                if not err_text or not err_cat:
-                    print(f"Error: Missing error_text or category in error: {error}")
+                if record_id is None or not err_cat:
+                    print(f"Error: Missing record_id or category in entry: {entry}")
                     continue
 
                 norm_err_cat = _norm(err_cat)
                 if norm_err_cat not in norm_categories:
-                    print(f"Error category '{err_cat}' doesn't exist! Error text: '{err_text}'. Applying 'Other' category instead.")
+                    print(f"Error category '{err_cat}' doesn't exist! (record_id={record_id}). Applying 'Other' category instead.")
                     norm_err_cat = _norm("Other")
 
-                error2category[_norm(err_text)] = norm_categories[norm_err_cat]
+                id2category[record_id] = norm_categories[norm_err_cat]
 
             except Exception as e:
-                print(f"Unexpected error while processing error entry: {e}")
+                print(f"Unexpected error while processing entry: {e}")
                 continue
-            
-    return error2category
+
+    return id2category
 
 
 def _norm(s: Any) -> str:
     return ("" if s is None else str(s)).strip().lower()
 
 
-async def _merge_records_with_categories(record: Dict, error_title: str, error_summary: str, error2category: Dict, categories: Dict) -> Dict:
+async def _merge_records_with_categories(record: Dict, record_index: int, error_title: str, error_summary: str, id2category: Dict, categories: Dict) -> Dict:
     cat = ""
     cat_desc = ""
     if error_title:
-        if _norm(error_title) not in error2category:
-            print(f"Error label haven't been assigned with a category! error text: {error_title}. Assigning 'Other' category instead.")
-        cat = error2category.get(_norm(error_title), "Other")
+        if record_index not in id2category:
+            print(f"Error label haven't been assigned with a category! record_index: {record_index}, error text: {error_title}. Assigning 'Other' category instead.")
+        cat = id2category.get(record_index, "Other")
         cat_desc = categories.get(cat, "")
 
     return {
@@ -112,14 +105,14 @@ async def populate_taxonomy(
     categories["Other"] = ""
 
     # error to category map
-    error2category = _map_error_to_category(error_classify, categories)
+    id2category = _map_error_to_category(error_classify, categories)
     
     # extract record descriptions 
     error_titles = await asyncio.gather(*[_extract_description(record, "error_title") for record in error_records])
-    error_summaries =  await asyncio.gather(*[_extract_description(record, "error_summary") for record in error_records])
+    error_summaries = await asyncio.gather(*[_extract_description(record, "error_summary") for record in error_records])
     
     # for each error record add error description and error category fields
-    result = await asyncio.gather(*[_merge_records_with_categories(record, error_titles[ind], error_summaries[ind], error2category, categories) for ind, record in enumerate(error_records)])
+    result = await asyncio.gather(*[_merge_records_with_categories(record, ind, error_titles[ind], error_summaries[ind], id2category, categories) for ind, record in enumerate(error_records)])
 
     # replace rare categories with other default category
     result_after_rare_categories_drop = _replace_rare_categories_with_other(result, rare_freq=rare_freq)

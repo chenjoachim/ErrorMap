@@ -113,6 +113,7 @@ async def main():
     parser.add_argument("--max-per-dataset", type=int, help="Maximum number of errors to sample per dataset")
     parser.add_argument("--exp-id", help="Custom experiment ID")
     parser.add_argument("--asr", action="store_true", default=False, help="Use ASR-specific error analysis prompt")
+    parser.add_argument("--data-path", default="data", help="Path to data directory (default: data)")
     parser.add_argument("--output-dir", default="output", help="Path to outputs directory (default: output)")
     parser.add_argument("--reuse-taxonomy", help="Path to existing taxonomy JSON to reuse top-level categories")
     args = parser.parse_args()
@@ -135,8 +136,9 @@ async def main():
             "model": "gpt-5-mini",
             "api_key": api_key,
             "max_tokens": 4000,
-            "reasoning_effort": "none",
+            "reasoning_effort": "minimal",
         },
+        data_path=args.data_path,
         datasets=args.dataset,
         dataset_params={
             ds: {"success_threshold": args.threshold} for ds in args.dataset

@@ -67,7 +67,8 @@ class ErrorMap:
         self.asr = asr
         self.reuse_taxonomy_path = reuse_taxonomy_path
         
-        # save exp. config params
+        # save exp. config params (redact api_key if present)
+        safe_litellm_config = {k: ("***" if k == "api_key" else v) for k, v in (litellm_config or {}).items()}
         params = {
             "inference_type": inference_type,
             "exp_id": str(exp_id),
@@ -82,7 +83,7 @@ class ErrorMap:
             "use_correct_predictions": use_correct_predictions,
             "models": models,
             "ratio": ratio,
-            "litellm_config": litellm_config,
+            "litellm_config": safe_litellm_config,
             "rare_freq": rare_freq,
             "max_per_dataset": max_per_dataset,
         }

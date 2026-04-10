@@ -27,11 +27,6 @@ def _extract_taxonomy_for_node(tree: Dict, depth: int, node_name: str) -> List[D
     target_children = []
     if depth == 0:
         target_children = tree.get("children", [])
-    elif depth == 1:
-        for child in tree.get("children", []):
-            if child["name"] == node_name:
-                target_children = child.get("children", [])
-                break
                 
     clusters = []
     for i, child in enumerate(target_children):

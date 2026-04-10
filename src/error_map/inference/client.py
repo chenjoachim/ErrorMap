@@ -72,6 +72,11 @@ class InferenceClient:
             return f"openai/{model}"
         return model
 
+    def _redact(self, text: str) -> str:
+        if self.api_key and self.api_key in text:
+            return text.replace(self.api_key, "***")
+        return text
+
     async def infer(
         self,
         template_name: str,
@@ -127,13 +132,14 @@ class InferenceClient:
                     )
                 
             except Exception as e:
-                print("EXCEPTION: ", e)
+                sanitized = self._redact(str(e))
+                print("EXCEPTION: ", sanitized)
                 return {
                     "model": self.judge,
                     "prompt": prompt,
                     "template": template_name,
                     "success": False,
-                    "error": str(e),
+                    "error": sanitized,
                     "full_response": None,
                     "content": None,
                 }

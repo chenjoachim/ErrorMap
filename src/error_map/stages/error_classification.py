@@ -30,27 +30,35 @@ def get_last_exsiting_taxonomy(error_taxonomy: List[Dict]) -> Dict:
     return taxonomy_dict
 
 
-async def classify_batch(description_batch: List, taxonomy: Dict, inference_client: InferenceClient, field: str) -> Dict:
-
+async def classify_batch(record_batch: List[Dict], taxonomy: Dict, inference_client: InferenceClient) -> Dict:
+    """Classify a batch of {title, summary} record dicts and return index→category mapping."""
+    data = [{"title": r["title"], "summary": r["summary"]} for r in record_batch]
     template_vars = {
-        "data_type": field,
-        "data": description_batch,
+        "data": data,
         "taxonomy": taxonomy,
     }
 
     try:
         result = await inference_client.infer("classify_errors.j2", template_vars, schema_name="classify_errors_schema.json")
+        categories = json.loads(result["content"]).get("classified_errors", [])
         return {
             "prompt": result["prompt"],
             "judge_model": result["model"],
             "judge_response": result["content"],
             "template_used": result["template"],
             "inference_success": result["success"],
-            "full_response": result["full_response"]
+            "full_response": result["full_response"],
+            # Attach per-record results for downstream mapping
+            "record_categories": [
+                {"record_id": r["record_id"], "category": categories[i] if i < len(categories) else "Other"}
+                for i, r in enumerate(record_batch)
+            ],
         }
     except Exception as e:
-        return {"error": str(e), "batch": description_batch}
-
+        return {
+            "error": str(e),
+            "record_categories": [{"record_id": r["record_id"], "category": "Other"} for r in record_batch],
+        }
 
 
 async def classify_errors(
@@ -63,17 +71,22 @@ async def classify_errors(
 ) -> List[Dict]:
     print(f"Classifying {len(error_records)} errors to taxonomy...")
 
-    # get unique error list
-    description_results = await asyncio.gather(*[_extract_description(record, field) for record in error_records])
-    descriptions = list(set([i for i in description_results if i]))
+    # Extract title + summary for each record individually (no deduplication)
+    titles = await asyncio.gather(*[_extract_description(record, "error_title") for record in error_records])
+    summaries = await asyncio.gather(*[_extract_description(record, "error_summary") for record in error_records])
+
+    record_inputs = [
+        {"record_id": i, "title": titles[i] or "", "summary": summaries[i] or ""}
+        for i in range(len(error_records))
+        if titles[i]
+    ]
 
     # use final existing taxonomy
     taxonomy = get_last_exsiting_taxonomy(error_taxonomy)
 
-    # send error batches to be classified
-    batch_size = config.taxonomy_params["classify_batch_size"]
-    description_batches = [descriptions[i:i + batch_size] for i in range(0, len(descriptions), batch_size)]
+    # send batches of 5 records to be classified
+    batch_size = config.taxonomy_params.get("classify_batch_size", 5)
+    batches = [record_inputs[i:i + batch_size] for i in range(0, len(record_inputs), batch_size)]
 
     # classify batches in parallel
-    return await tqdm_asyncio.gather(*[classify_batch(description_batch, taxonomy, inference_client, field) for description_batch in description_batches])
-
+    return await tqdm_asyncio.gather(*[classify_batch(batch, taxonomy, inference_client) for batch in batches])
