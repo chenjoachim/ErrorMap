@@ -43,9 +43,8 @@ for bench_dir in "$BASE_DIR"/*/; do
                     
                     # Optional: if you are worried about file name collisions, uncomment the below line
                     # and comment out the simple `cp` to prepend the benchmark and tag to the resulting file.
-                    # cp "$latest_eval" "$DEST_DIR/${bench}_${tag}_${filename}"
-                    
-                    cp "$latest_eval" "$DEST_DIR/"
+                    cp "$latest_eval" "$DEST_DIR/${bench}__${tag}_${filename}"
+
                 fi
             fi
         done

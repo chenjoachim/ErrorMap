@@ -31,6 +31,7 @@ class ErrorMap:
                  cols_to_keep: List[str] = None,
                  asr: bool = False,
                  reuse_taxonomy_path: str = None,
+                 max_per_dataset: Optional[int] = None,
                  ):
         
         
@@ -83,6 +84,7 @@ class ErrorMap:
             "ratio": ratio,
             "litellm_config": litellm_config,
             "rare_freq": rare_freq,
+            "max_per_dataset": max_per_dataset,
         }
         with open(os.path.join(self.output_dir, "config__exp_id=" + self.exp_id + ".json"), "w") as f:
             json.dump(params, f, indent=4)
@@ -96,6 +98,7 @@ class ErrorMap:
             taxonomy_params=TaxonomyParams(),
             seed=seed,
             asr=asr,
+            max_per_dataset=max_per_dataset,
         )
 
         # Setup inference client

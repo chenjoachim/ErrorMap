@@ -41,14 +41,24 @@ async def _load_dataset_async(data_path: str, dataset: str) -> List[Dict]:
         return await loop.run_in_executor(executor, _load_csv_sync, data_path, dataset)
 
 
-def _sample_failures(failures: List[Dict], ratio: float, seed: int) -> List[Dict]:
+def _sample_failures(failures: List[Dict], ratio: float, seed: int, max_per_dataset: Optional[int] = None) -> List[Dict]:
     df = pd.DataFrame(failures)
-    sampled_df = (
-        df.groupby(['model', 'dataset'], group_keys=False)
-        .sample(frac=ratio, random_state=seed)
-        .reset_index(drop=True)   
-    )
-    return sampled_df.to_dict('records')
+    
+    if ratio < 1.0:
+        df = (
+            df.groupby(['model', 'dataset'], group_keys=False)
+            .sample(frac=ratio, random_state=seed)
+            .reset_index(drop=True)   
+        )
+        
+    if max_per_dataset is not None:
+        df = (
+            df.groupby('dataset', group_keys=False)
+            .apply(lambda x: x.sample(n=min(len(x), max_per_dataset), random_state=seed))
+            .reset_index(drop=True)
+        )
+        
+    return df.to_dict('records')
 
 
 @cached("data_preparation", None)
@@ -86,7 +96,7 @@ async def prepare_data(
     successes = [r for r in records if not r['error']]
 
     if failures:
-        sampled_failures = _sample_failures(failures, ratio, config.seed)
+        sampled_failures = _sample_failures(failures, ratio, config.seed, config.max_per_dataset)
     else:
         sampled_failures = []
 

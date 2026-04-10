@@ -13,15 +13,43 @@ import math
 import asyncio
 
 
-def _load_existing_taxonomy(taxonomy_path: str) -> List[Dict]:
-    """Load a saved taxonomy JSON and convert it to the format classify_errors expects."""
+def _load_existing_taxonomy(taxonomy_path: str) -> Dict:
+    """Load a saved taxonomy JSON tree."""
     with open(taxonomy_path) as f:
         tree = json.load(f)
-    clusters = [
-        {"id": i + 1, "name": child["name"], "description": child.get("info", {}).get("description", "")}
-        for i, child in enumerate(tree.get("children", []))
-    ]
-    print(f"Reusing existing taxonomy with {len(clusters)} categories: {[c['name'] for c in clusters]}")
+    print(f"Loaded existing taxonomy tree from {taxonomy_path}")
+    return tree
+
+def _extract_taxonomy_for_node(tree: Dict, depth: int, node_name: str) -> List[Dict]:
+    if not tree:
+        return None
+        
+    target_children = []
+    if depth == 0:
+        target_children = tree.get("children", [])
+    elif depth == 1:
+        for child in tree.get("children", []):
+            if child["name"] == node_name:
+                target_children = child.get("children", [])
+                break
+                
+    clusters = []
+    for i, child in enumerate(target_children):
+        # Skip leaf nodes (actual error items) which have error_title in info
+        if "error_title" in child.get("info", {}):
+            continue
+            
+        desc = child.get("info", {}).get("description", "")
+        clusters.append({
+            "id": i + 1, 
+            "name": child["name"], 
+            "description": desc
+        })
+
+    if not clusters:
+        return None
+        
+    print(f"Reusing taxonomy for node '{node_name}' (depth {depth}) with {len(clusters)} categories: {[c['name'] for c in clusters]}")
     return [{"judge_response": json.dumps({"clusters": clusters})}]
 
 
@@ -135,14 +163,16 @@ async def _recurse_error_collection(
     max_depth: int = 2,
     taxonomy_tree: TaxonomyTree = None,
     rare_freq: float = None,
-    existing_taxonomy: List[Dict] = None,
+    existing_taxonomy_tree: Dict = None,
 ):
     print(f"in recurse, records: {len(records)}")
 
     parent_node_name = parent_node.name if depth > 0 and parent_node.name else None # avoid using the name of the root node or an empty string
-    # only reuse taxonomy at the top level (depth 0); sub-categories are always rebuilt
-    top_level_taxonomy = existing_taxonomy if depth == 0 else None
-    populated = await _run_taxonomy_stages(records, config, exp_id, inference_client, parent_category_name=parent_node_name, rare_freq=rare_freq, existing_taxonomy=top_level_taxonomy)
+    
+    # Extract the applicable taxonomy for this level based on the tree structure
+    node_taxonomy = _extract_taxonomy_for_node(existing_taxonomy_tree, depth, parent_node_name)
+    
+    populated = await _run_taxonomy_stages(records, config, exp_id, inference_client, parent_category_name=parent_node_name, rare_freq=rare_freq, existing_taxonomy=node_taxonomy)
     if not populated:
         return
 
@@ -183,6 +213,7 @@ async def _recurse_error_collection(
                 max_depth=max_depth,
                 taxonomy_tree=taxonomy_tree,
                 rare_freq=rare_freq,
+                existing_taxonomy_tree=existing_taxonomy_tree,
             ))
 
     if tasks:
@@ -207,7 +238,7 @@ async def construct_taxonomy_recursively(
     )
     taxonomy_tree = TaxonomyTree(root)
 
-    existing_taxonomy = _load_existing_taxonomy(reuse_taxonomy_path) if reuse_taxonomy_path else None
+    existing_taxonomy_tree = _load_existing_taxonomy(reuse_taxonomy_path) if reuse_taxonomy_path else None
 
     await _recurse_error_collection(
                 records=records,
@@ -218,7 +249,7 @@ async def construct_taxonomy_recursively(
                 depth=depth,
                 max_depth=max_depth,
                 taxonomy_tree=taxonomy_tree,
-                existing_taxonomy=existing_taxonomy,
+                existing_taxonomy_tree=existing_taxonomy_tree,
                 rare_freq=rare_freq,
             )
     try:

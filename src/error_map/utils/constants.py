@@ -30,7 +30,7 @@ class TaxonomyParams:
         metadata={"description": "Maximum length for explanations"}
     )
     max_num_clusters: int = field(
-        default=25,
+        default=10,
         metadata={"description": "Maximum number of clusters allowed"}
     )
     taxonomy_update_repeat: int = field(

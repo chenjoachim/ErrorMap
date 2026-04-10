@@ -14,7 +14,8 @@ class Config:
                  dataset_params: Dict = None,
                  taxonomy_params: TaxonomyParams = None,
                  seed: int = None,
-                 asr: bool = False):
+                 asr: bool = False,
+                 max_per_dataset: int = None):
         self.data_path = data_path or "data"
         self.output_dir = output_dir or Path("output")
         self.datasets = datasets or []
@@ -22,6 +23,7 @@ class Config:
         self.taxonomy_params = taxonomy_params.get() if taxonomy_params else {}
         self.seed = seed
         self.asr = asr
+        self.max_per_dataset = max_per_dataset
 
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
