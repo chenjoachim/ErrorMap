@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
 Convert batches of Inspect AI .eval files (Zip format) to ErrorMap CSV format.
-Extracts summaries.json from each .eval file in `higgs_evals/` and
-appends rows to the appropriate `data/<benchmark>.csv`.
+Extracts summaries.json from each .eval file and writes rows to output CSVs.
+
+Usage:
+    python convert_all_evals.py
+    python convert_all_evals.py --evals-dir higgs_evals/higgs-audio-m3__erik-v3 --output-dir data/higgs-audio-m3__erik-v3
 """
 
+import argparse
 import json
 import os
 import zipfile
@@ -13,11 +17,23 @@ from pathlib import Path
 from whisper_normalizer.english import EnglishTextNormalizer
 from whisper_normalizer.basic import BasicTextNormalizer
 
-EVALS_DIR = "higgs_evals"
-OUTPUT_DIR = "data"
-
 _english_normalizer = EnglishTextNormalizer()
 _basic_normalizer = BasicTextNormalizer()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Convert Inspect AI .eval files to ErrorMap CSV format.")
+    parser.add_argument(
+        "--evals-dir",
+        default="higgs_evals",
+        help="Directory containing .eval files (default: higgs_evals)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="data",
+        help="Directory to write output CSVs (default: data)",
+    )
+    return parser.parse_args()
 
 
 def normalize_text(text: str, language: str = "en") -> str:
@@ -106,11 +122,15 @@ def process_eval_file(eval_path, all_dataset_rows):
 
 
 def main():
-    Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    args = parse_args()
+    evals_dir = args.evals_dir
+    output_dir = args.output_dir
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     all_dataset_rows = {}
-    
-    eval_files = list(Path(EVALS_DIR).glob("*.eval"))
-    print(f"Found {len(eval_files)} .eval files in {EVALS_DIR}.")
+
+    eval_files = list(Path(evals_dir).glob("*.eval"))
+    print(f"Found {len(eval_files)} .eval files in {evals_dir}.")
     
     if not eval_files:
         print("Nothing to process.")
@@ -119,9 +139,9 @@ def main():
     for eval_file in eval_files:
         print(f"Processing {eval_file.name}...")
         process_eval_file(eval_file, all_dataset_rows)
-        
+
     for benchmark, rows in all_dataset_rows.items():
-        output_csv = Path(OUTPUT_DIR) / f"{benchmark}.csv"
+        output_csv = Path(output_dir) / f"{benchmark}.csv"
         
         with open(output_csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(

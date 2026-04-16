@@ -1,0 +1,79 @@
+{
+  "name": "LLM Errors",
+  "info": {
+    "description": ""
+  },
+  "children": [
+    {
+      "name": "Out-of-Vocabulary / Proper Noun",
+      "info": {
+        "description": "Failures on named entities, rare words, and terms absent from the training lexicon — manifesting as deletions, phonetic approximations, or garbled substitutions.",
+        "solution": "Lexicon expansion with domain-specific wordlists; subword/BPE models (e.g. Whisper-style tokenization) to handle unseen surface forms; entity-biasing at decode time."
+      },
+      "children": []
+    },
+    {
+      "name": "Phonetic Confusability",
+      "info": {
+        "description": "Substitutions driven by acoustic similarity: homophones, minimal phoneme pairs (e.g. b/p, d/t), vowel reduction errors, or phone insertions/deletions under noise.",
+        "solution": "Acoustic model fine-tuning on minimal-pair augmented data; contrastive decoding with phoneme-level LM; noise-robust feature extraction (e.g. SpecAugment, multi-condition training)."
+      },
+      "children": []
+    },
+    {
+      "name": "Word Boundary Segmentation",
+      "info": {
+        "description": "Incorrect tokenization at word boundaries — merging adjacent words (e.g. 'in a' → 'inna') or splitting single words — caused by prosodic reduction or fast speech.",
+        "solution": "Improved VAD and endpointing; CTC alignment tuning; training on spontaneous / fast-speech corpora to expose the model to boundary-blurred acoustics."
+      },
+      "children": []
+    },
+    {
+      "name": "Function-Word Dropout",
+      "info": {
+        "description": "Deletion, insertion, or substitution of unstressed function words (determiners, prepositions, auxiliaries, pronouns) whose acoustic signal is weak or absent in connected speech.",
+        "solution": "LM rescoring with stronger priors on grammatical function words; fine-tuning on read-aloud vs. conversational data to model reduction patterns."
+      },
+      "children": []
+    },
+    {
+      "name": "Language Model Bias",
+      "info": {
+        "description": "Decoder LM overrides the acoustic signal in favour of high-frequency phrases or n-gram patterns — substituting a plausible word that sounds wrong acoustically.",
+        "solution": "Reduce LM weight in the beam search; train or fine-tune a domain-specific LM; apply minimum Bayes risk (MBR) decoding to downweight over-confident hypotheses."
+      },
+      "children": []
+    },
+    {
+      "name": "Numeric and Alphanumeric",
+      "info": {
+        "description": "Errors normalizing spoken-form numbers, dates, units, acronyms, and alphanumeric tokens (e.g. 'twenty twenty-four' vs '2024'; 'NATO' vs 'nato').",
+        "solution": "Post-processing inverse text normalization (ITN) rules or a learned ITN model; include formatted/spoken-form pairs in training data."
+      },
+      "children": []
+    },
+    {
+      "name": "Speaker / Accent Variability",
+      "info": {
+        "description": "Systematic errors correlated with speaker identity — accent, dialect, pitch range, or speaking rate — producing consistent substitution patterns not explained by phoneme confusion alone.",
+        "solution": "Speaker-adaptive fine-tuning (x-vector conditioning, LHUC); accent-diverse training data; test-time adaptation with a few utterances of the target speaker."
+      },
+      "children": []
+    },
+    {
+      "name": "Disfluency and Endpointing",
+      "info": {
+        "description": "Spurious or missing tokens from hesitations, repetitions, self-corrections, false starts, or premature / delayed end-of-speech detection cutting off words.",
+        "solution": "Separate disfluency detection layer post-ASR; endpointer tuning (patience window, silence threshold); train on spontaneous speech with disfluency annotations."
+      },
+      "children": []
+    },
+    {
+      "name": "Other",
+      "info": {
+        "description": ""
+      },
+      "children": []
+    }
+  ]
+}

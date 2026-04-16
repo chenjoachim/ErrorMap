@@ -237,24 +237,26 @@ def main():
     parser.add_argument("csv_path", help="Path to the categorized output CSV (e.g., from construct_taxonomy_recursively).")
     parser.add_argument("--category-col", default="category_depth_0", help="Column containing the primary error category.")
     parser.add_argument("--examples", type=int, default=1, help="Number of representative examples to show per category.")
+    parser.add_argument("--data-dir", default="data", help="Path to the data directory containing benchmark CSVs (default: data).")
 
     args = parser.parse_args()
 
     csv_path = Path(args.csv_path)
+    data_dir = Path(args.data_dir)
     df = load_classified_data(args.csv_path)
     exp_id = extract_exp_id(csv_path)
     if exp_id is not None:
         df = enrich_with_targets(df, exp_id, csv_path.parent)
-    df = enrich_with_ref_length(df, Path("data"))
+    df = enrich_with_ref_length(df, data_dir)
     print(f"Loaded {len(df)} categorized errors from {args.csv_path}")
     print("=" * 60)
     print()
-    
-    full_df = load_full_benchmark_data(Path("data"), df["model"].unique().tolist())
+
+    full_df = load_full_benchmark_data(data_dir, df["model"].unique().tolist())
     print_wer_by_benchmark(full_df)
     print_overall_distribution(df, category_col=args.category_col)
     print_benchmark_breakdown(df, category_col=args.category_col)
-    
+
     if args.examples > 0:
         print_representative_examples(df, category_col=args.category_col, n=args.examples)
 

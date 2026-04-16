@@ -1,54 +1,78 @@
 #!/bin/bash
+# Copy the latest .eval file for a specific (model, tag) pair into a namespaced destination.
+#
+# Usage:
+#   bash copy_latest_evals.sh <model> <tag> [dest_dir]
+#
+# Examples:
+#   bash copy_latest_evals.sh higgs-audio-m3 erik-v3
+#   bash copy_latest_evals.sh higgs-audio-m3 chk65k-v3 ./higgs_evals/higgs-audio-m3__chk65k-v3
 
-# Target folder where the latest .eval files will be copied
-# You can pass the target folder as the first argument, defaults to "latest_evals"
-DEST_DIR=${1:-"./latest_evals"}
+MODEL=${1:?"Usage: $0 <model> <tag> [dest_dir]"}
+TAG=${2:?"Usage: $0 <model> <tag> [dest_dir]"}
+DEST_DIR=${3:-"./higgs_evals/${MODEL}__${TAG}"}
+
 mkdir -p "$DEST_DIR"
 
-BASE_DIR="/hot-data/project/evaluation/results/inspectai-api/higgs-audio-m3"
+BASE_DIR="/hot-data/project/evaluation/results/inspectai-api/${MODEL}"
 
-# The specific tags to look for
-TAGS=(
-    "chk65k-v3"
-    "erik-v3"
-    "20260309-erik-base"
-    "20260319-erik-v3"
-)
+if [[ ! -d "$BASE_DIR" ]]; then
+    echo "Error: base directory not found: $BASE_DIR" >&2
+    exit 1
+fi
 
-echo "Copying latest .eval files to: $DEST_DIR"
+echo "Model : $MODEL"
+echo "Tag   : $TAG"
+echo "Dest  : $DEST_DIR"
+echo ""
 
-# Loop through all available benchmarks
+found=0
+
 for bench_dir in "$BASE_DIR"/*/; do
-    # Skip if BASE_DIR happens to be empty
     [ -e "$bench_dir" ] || continue
-    
-    bench=$(basename "$bench_dir")
-    
-    # Check if benchmark is open_asr_* (can contain extra underscores)
-    # or fleurs_asr_* (with no additional underscores)
-    if [[ "$bench" =~ ^open_asr_.*$ ]] || [[ "$bench" =~ ^fleurs_asr_[^_]+$ ]]; then
-        
-        for tag in "${TAGS[@]}"; do
-            tag_dir="$bench_dir$tag"
-            
-            # Check if the tag directory exists
-            if [[ -d "$tag_dir" ]]; then
-                
-                # Fetch the latest .eval file sorted by modification time
-                latest_eval=$(ls -1t "$tag_dir"/*.eval 2>/dev/null | head -n 1)
-                
-                if [[ -n "$latest_eval" ]]; then
-                    filename=$(basename "$latest_eval")
-                    echo "Found latest eval for $bench/$tag: $filename"
-                    
-                    # Optional: if you are worried about file name collisions, uncomment the below line
-                    # and comment out the simple `cp` to prepend the benchmark and tag to the resulting file.
-                    cp "$latest_eval" "$DEST_DIR/${bench}__${tag}_${filename}"
 
+    bench=$(basename "$bench_dir")
+
+    if [[ "$bench" =~ ^open_asr_.*$ ]] || [[ "$bench" =~ ^fleurs_asr_[^_]+$ ]]; then
+        tag_dir="$bench_dir$TAG"
+
+        if [[ -d "$tag_dir" ]]; then
+            selected=""
+            while IFS= read -r candidate; do
+                if python3 -c "
+import zipfile, sys
+try:
+    with zipfile.ZipFile(sys.argv[1]) as z:
+        z.open('summaries.json').read(1)
+    sys.exit(0)
+except Exception as e:
+    print(f'  [invalid] {sys.argv[1]}: {e}', flush=True)
+    sys.exit(1)
+" "$candidate" 2>/dev/null; then
+                    selected="$candidate"
+                    break
+                else
+                    echo "  $bench → $(basename "$candidate") [CORRUPT, skipping]"
                 fi
+            done < <(ls -1t "$tag_dir"/*.eval 2>/dev/null)
+
+            if [[ -n "$selected" ]]; then
+                filename=$(basename "$selected")
+                dest_file="$DEST_DIR/${bench}__${TAG}_${filename}"
+                echo "  $bench → $filename"
+                cp "$selected" "$dest_file"
+                ((found++))
+            else
+                echo "  $bench → no valid .eval found (all corrupt or missing)"
             fi
-        done
+        fi
     fi
 done
 
-echo "Done!"
+if [[ $found -eq 0 ]]; then
+    echo "Warning: no .eval files found for tag '$TAG' under $BASE_DIR" >&2
+    exit 1
+fi
+
+echo ""
+echo "Done — copied $found file(s) to $DEST_DIR"
