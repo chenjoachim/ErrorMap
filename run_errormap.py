@@ -100,8 +100,8 @@ async def main():
     parser.add_argument(
         "--threshold",
         type=float,
-        default=0.8,
-        help="Success threshold for score (default: 0.8 → WER > 20%% is an error)",
+        default=0.85,
+        help="Success threshold for score (default: 0.85 → WER > 15%% is an error)",
     )
     parser.add_argument(
         "--ratio",

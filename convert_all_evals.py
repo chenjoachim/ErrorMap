@@ -101,6 +101,7 @@ def process_eval_file(eval_path, all_dataset_rows):
             "output_text": normalize_text(scorer.get("answer", ""), language),
             "score": score_val,
             "correct_answer": normalize_text(item.get("target", ""), language),
+            "ref_length": ref_length if 'ref_length' in locals() else len(normalize_text(item.get("target", ""), language).split()),
         })
 
 
@@ -125,7 +126,7 @@ def main():
         with open(output_csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["example_id", "model", "input_text", "output_text", "score", "correct_answer"],
+                fieldnames=["example_id", "model", "input_text", "output_text", "score", "correct_answer", "ref_length"],
             )
             writer.writeheader()
             writer.writerows(rows)

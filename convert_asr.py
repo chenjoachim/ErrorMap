@@ -47,13 +47,14 @@ def convert(input_path: str, output_path: str, model_name: str, scorer_key: str 
             "output_text": scorer.get("answer", ""),
             "score": score,
             "correct_answer": item.get("target", ""),
+            "ref_length": scorer.get("metadata", {}).get("ref_length", len(item.get("target", "").split())),
         })
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["example_id", "model", "input_text", "output_text", "score", "correct_answer"],
+            fieldnames=["example_id", "model", "input_text", "output_text", "score", "correct_answer", "ref_length"],
         )
         writer.writeheader()
         writer.writerows(rows)
